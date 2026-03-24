@@ -5,16 +5,24 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/home'
-    },
-    {
-      path: '/home',
-      name: 'home',
-      component: () => import('@/views/home.vue')
+      component: () => import('@/layout/index.vue'),
+      redirect: '/xhs',
+      children: [
+        {
+          path: 'xhs',
+          name: 'xiaohongshu',
+          component: () => import('@/views/xiaohongshu/index.vue')
+        },
+        {
+          path: 'wechat',
+          name: 'wechat',
+          component: () => import('@/views/wechat/index.vue')
+        }
+      ]
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/home'
+      redirect: '/xhs'
     }
   ]
 })

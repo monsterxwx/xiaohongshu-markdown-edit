@@ -16,7 +16,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { Message } from '../../components/Message/index.js'
+import { Message } from '@/components/Message/index'
 
 const props = defineProps({
   modelValue: {

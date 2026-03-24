@@ -28,7 +28,9 @@
         ></textarea>
       </div>
 
-      <button class="export-btn" @click="exportImage">💾 导出超清封面图</button>
+      <button class="export-btn" :disabled="isExporting" @click="exportImage">
+        {{ isExporting ? '⏳ 正在导出，请稍候...' : '💾 导出超清封面图' }}
+      </button>
       <div class="tips">💡 提示：选中文字后点击上方工具栏，可以快速添加加粗、标题等排版样式！</div>
     </div>
 
@@ -66,6 +68,7 @@ const markdownText = ref(`# 🌟 2026 前端大咖学习路线
 
 const coverRef = ref(null)
 const textareaRef = ref(null)
+const isExporting = ref(false)
 
 const parsedHTML = computed(() => {
   return marked.parse(markdownText.value)
@@ -153,7 +156,8 @@ const insertSyntax = (type) => {
 }
 
 const exportImage = async () => {
-  if (!coverRef.value) return
+  if (!coverRef.value || isExporting.value) return
+  isExporting.value = true
   try {
     const dataUrl = await htmlToImage.toPng(coverRef.value, {
       quality: 1,
@@ -170,13 +174,13 @@ const exportImage = async () => {
   } catch (err) {
     console.error('导出失败:', err)
     alert('导出图片失败，请检查控制台')
+  } finally {
+    isExporting.value = false
   }
 }
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@700&display=swap');
-
 .container-home {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -311,10 +315,17 @@ textarea:focus {
   box-shadow: 0 6px 16px rgba(255, 36, 66, 0.3);
 }
 
-.export-btn:hover {
+.export-btn:hover:not(:disabled) {
   background: #e61e38;
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(255, 36, 66, 0.4);
+}
+
+.export-btn:disabled {
+  background: #ffb4c0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .tips {

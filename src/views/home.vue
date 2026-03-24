@@ -3,7 +3,13 @@
     <div class="editor-panel">
       <h2>✨ 小红书封面生成器</h2>
 
-      <div class="form-group">
+      <!-- 模式切换 -->
+      <div class="mode-tabs">
+        <button :class="['tab-btn', currentMode === 'markdown' ? 'active' : '']" @click="currentMode = 'markdown'">文字排版</button>
+        <button :class="['tab-btn', currentMode === 'image' ? 'active' : '']" @click="currentMode = 'image'">图片加字</button>
+      </div>
+
+      <div class="form-group" v-if="currentMode === 'markdown'">
         <label>Markdown 内容</label>
         
         <!-- Markdown 工具栏 -->
@@ -28,6 +34,37 @@
         ></textarea>
       </div>
 
+      <div class="form-group image-mode-group" v-else-if="currentMode === 'image'">
+        <div class="tool-section">
+          <label>背景图片 (3:4)</label>
+          <div class="upload-box" @click="$refs.bgInput.click()">
+            <span v-if="!imageConfig.bgUrl">点击上传背景图</span>
+            <span v-else>重新上传背景图</span>
+            <input type="file" ref="bgInput" accept="image/*" @change="uploadBg" style="display: none;" />
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <label>标题文字</label>
+          <textarea v-model="imageConfig.titleText" placeholder="输入封面标题，可在右侧拖拽定位..." rows="2" class="title-input"></textarea>
+        </div>
+
+        <div class="tool-section row">
+          <div class="control-item">
+            <label>文字颜色</label>
+            <input type="color" v-model="imageConfig.titleColor" class="color-picker" />
+          </div>
+          <div class="control-item">
+            <label>文字大小 (px)</label>
+            <input type="number" v-model="imageConfig.titleFontSize" class="number-input" min="12" max="200" />
+          </div>
+          <div class="control-item">
+            <label>行高</label>
+            <input type="number" v-model="imageConfig.titleLineHeight" class="number-input" min="0.5" max="3" step="0.1" />
+          </div>
+        </div>
+      </div>
+
       <button class="export-btn" :disabled="isExporting" @click="exportImage">
         {{ isExporting ? '⏳ 正在导出，请稍候...' : '💾 导出超清封面图' }}
       </button>
@@ -37,8 +74,27 @@
     <div class="preview-panel">
       <!-- 预览区，严格 3:4 比例，小红书标准的比例 1080x1440 -->
       <div class="cover-wrapper" ref="coverRef">
-        <div class="cover-content">
+        <div class="cover-content" v-if="currentMode === 'markdown'">
           <div class="markdown-body" v-html="parsedHTML"></div>
+        </div>
+
+        <div class="cover-image-content" v-else-if="currentMode === 'image'" :style="{ backgroundImage: imageConfig.bgUrl ? 'url(' + imageConfig.bgUrl + ')' : '' }">
+          <div v-if="!imageConfig.bgUrl" class="empty-bg-tip">暂无背景，请在左侧上传</div>
+          <div 
+            class="draggable-title" 
+            v-show="imageConfig.titleText"
+            :style="{ 
+              left: imageConfig.titleX + 'px', 
+              top: imageConfig.titleY + 'px', 
+              color: imageConfig.titleColor, 
+              fontSize: imageConfig.titleFontSize + 'px',
+              lineHeight: imageConfig.titleLineHeight || 1.2
+            }"
+            @mousedown="startDrag"
+            @touchstart="startDrag"
+          >
+            {{ imageConfig.titleText }}
+          </div>
         </div>
       </div>
     </div>
@@ -46,9 +102,23 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { marked } from 'marked'
 import * as htmlToImage from 'html-to-image'
+
+const currentMode = ref('markdown')
+
+const imageConfig = ref({
+  bgUrl: '',
+  titleText: '输入您的标题',
+  titleColor: '#333333',
+  titleFontSize: 48,
+  titleLineHeight: 1.2,
+  titleX: 50,
+  titleY: 100
+})
+
+const bgInput = ref(null)
 
 const markdownText = ref(`# 🌟 2026 前端大咖学习路线
 
@@ -73,6 +143,70 @@ const isExporting = ref(false)
 const parsedHTML = computed(() => {
   return marked.parse(markdownText.value)
 })
+
+onMounted(() => {
+  const saved = localStorage.getItem('xhs-image-config')
+  if (saved) {
+    try {
+      imageConfig.value = { ...imageConfig.value, ...JSON.parse(saved) }
+    } catch(e) {}
+  }
+})
+
+watch(() => imageConfig.value, (val) => {
+  localStorage.setItem('xhs-image-config', JSON.stringify(val))
+}, { deep: true })
+
+const uploadBg = (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      imageConfig.value.bgUrl = ev.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+// 拖拽文字逻辑
+let dragState = { isDragging: false, startX: 0, startY: 0, initialX: 0, initialY: 0 }
+
+const startDrag = (e) => {
+  dragState.isDragging = true
+  const touch = e.type === 'touchstart' ? e.touches[0] : e
+  dragState.startX = touch.clientX
+  dragState.startY = touch.clientY
+  dragState.initialX = imageConfig.value.titleX
+  dragState.initialY = imageConfig.value.titleY
+  
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+  document.addEventListener('touchmove', onDrag, { passive: false })
+  document.addEventListener('touchend', stopDrag)
+}
+
+const onDrag = (e) => {
+  if (!dragState.isDragging) return
+  if (e.cancelable) e.preventDefault()
+  
+  const touch = e.type.startsWith('touch') ? e.touches[0] : e
+  const dx = touch.clientX - dragState.startX
+  const dy = touch.clientY - dragState.startY
+  
+  const isMobile = window.innerWidth <= 768
+  const scale = isMobile ? 0.7 : 1
+  
+  imageConfig.value.titleX = dragState.initialX + dx / scale
+  imageConfig.value.titleY = dragState.initialY + dy / scale
+}
+
+const stopDrag = () => {
+  dragState.isDragging = false
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+  document.removeEventListener('touchmove', onDrag)
+  document.removeEventListener('touchend', stopDrag)
+}
 
 // 插入 Markdown 语法的核心逻辑
 const insertSyntax = (type) => {
@@ -206,8 +340,37 @@ const exportImage = async () => {
 .editor-panel h2 {
   margin-top: 0;
   color: #1a1a1a;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   font-size: 24px;
+}
+
+/* 模式切换 Tabs */
+.mode-tabs {
+  display: flex;
+  background: #f1f2f5;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px 0;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: #606266;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.tab-btn.active {
+  background: white;
+  color: #ff2442;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .form-group {
@@ -215,6 +378,89 @@ const exportImage = async () => {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+/* Image Mode Setup */
+.image-mode-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tool-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-section.row {
+  flex-direction: row;
+  gap: 16px;
+}
+
+.control-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.upload-box {
+  width: 100%;
+  height: 80px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  background-color: #fafbfc;
+}
+
+.upload-box:hover {
+  border-color: #ff2442;
+  color: #ff2442;
+}
+
+.title-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e4e7ed;
+  border-radius: 8px;
+  font-size: 14px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.title-input:focus {
+  border-color: #ff2442;
+}
+
+.color-picker {
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  border: 2px solid #e4e7ed;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.number-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 2px solid #e4e7ed;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.number-input:focus {
+  border-color: #ff2442;
 }
 
 .form-group label {
@@ -373,6 +619,41 @@ textarea:focus {
   flex-direction: column;
   justify-content: flex-start; 
   overflow: hidden;
+}
+
+.cover-image-content {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  overflow: hidden;
+  background-color: #ececec;
+}
+
+.empty-bg-tip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #909399;
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.draggable-title {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+  white-space: pre-wrap;
+  line-height: 1.2;
+  font-weight: 900;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.draggable-title:active {
+  cursor: grabbing;
 }
 
 /* ================= 预览区排版 ================= */

@@ -9,61 +9,8 @@
         <button :class="['tab-btn', currentMode === 'image' ? 'active' : '']" @click="currentMode = 'image'">图片加字</button>
       </div>
 
-      <div class="form-group" v-if="currentMode === 'markdown'">
-        <label>Markdown 内容</label>
-        
-        <!-- Markdown 工具栏 -->
-        <div class="toolbar">
-          <button class="tool-btn font-bold" @click="insertSyntax('bold')" title="加粗">B</button>
-          <button class="tool-btn font-italic" @click="insertSyntax('italic')" title="斜体">I</button>
-          <div class="divider"></div>
-          <button class="tool-btn" @click="insertSyntax('h1')" title="大标题">H1</button>
-          <button class="tool-btn" @click="insertSyntax('h2')" title="小标题">H2</button>
-          <div class="divider"></div>
-          <button class="tool-btn" @click="insertSyntax('quote')" title="金句引用">”</button>
-          <button class="tool-btn text-xl" @click="insertSyntax('ul')" title="无序列表">•</button>
-          <button class="tool-btn" @click="insertSyntax('ol')" title="有序列表">1.</button>
-          <div class="divider"></div>
-          <button class="tool-btn" @click="insertSyntax('hr')" title="分割线">—</button>
-        </div>
-
-        <textarea 
-          ref="textareaRef"
-          v-model="markdownText" 
-          placeholder="输入 Markdown 内容..."
-        ></textarea>
-      </div>
-
-      <div class="form-group image-mode-group" v-else-if="currentMode === 'image'">
-        <div class="tool-section">
-          <label>背景图片 (3:4)</label>
-          <div class="upload-box" @click="$refs.bgInput.click()">
-            <span v-if="!imageConfig.bgUrl">点击上传背景图</span>
-            <span v-else>重新上传背景图</span>
-            <input type="file" ref="bgInput" accept="image/*" @change="uploadBg" style="display: none;" />
-          </div>
-        </div>
-
-        <div class="tool-section">
-          <label>标题文字</label>
-          <textarea v-model="imageConfig.titleText" placeholder="输入封面标题，可在右侧拖拽定位..." rows="2" class="title-input"></textarea>
-        </div>
-
-        <div class="tool-section row">
-          <div class="control-item">
-            <label>文字颜色</label>
-            <input type="color" v-model="imageConfig.titleColor" class="color-picker" />
-          </div>
-          <div class="control-item">
-            <label>文字大小 (px)</label>
-            <input type="number" v-model="imageConfig.titleFontSize" class="number-input" min="12" max="200" />
-          </div>
-          <div class="control-item">
-            <label>行高</label>
-            <input type="number" v-model="imageConfig.titleLineHeight" class="number-input" min="0.5" max="3" step="0.1" />
-          </div>
-        </div>
-      </div>
+      <MarkdownEditor v-if="currentMode === 'markdown'" v-model="markdownText" :isAILoading="isAILoading" @ai-format="handleAIFormat" />
+      <ImageEditor v-else-if="currentMode === 'image'" v-model="imageConfig" />
 
       <button class="export-btn" :disabled="isExporting" @click="exportImage">
         {{ isExporting ? '⏳ 正在导出，请稍候...' : '💾 导出超清封面图' }}
@@ -71,42 +18,29 @@
       <div class="tips">💡 提示：选中文字后点击上方工具栏，可以快速添加加粗、标题等排版样式！</div>
     </div>
 
-    <div class="preview-panel">
-      <!-- 预览区，严格 3:4 比例，小红书标准的比例 1080x1440 -->
-      <div class="cover-wrapper" ref="coverRef">
-        <div class="cover-content" v-if="currentMode === 'markdown'">
-          <div class="markdown-body" v-html="parsedHTML"></div>
-        </div>
+    <CoverPreview 
+      ref="previewRef"
+      :currentMode="currentMode" 
+      :markdownText="markdownText" 
+      v-model:imageConfig="imageConfig" 
+    />
 
-        <div class="cover-image-content" v-else-if="currentMode === 'image'" :style="{ backgroundImage: imageConfig.bgUrl ? 'url(' + imageConfig.bgUrl + ')' : '' }">
-          <div v-if="!imageConfig.bgUrl" class="empty-bg-tip">暂无背景，请在左侧上传</div>
-          <div 
-            class="draggable-title" 
-            v-show="imageConfig.titleText"
-            :style="{ 
-              left: imageConfig.titleX + 'px', 
-              top: imageConfig.titleY + 'px', 
-              color: imageConfig.titleColor, 
-              fontSize: imageConfig.titleFontSize + 'px',
-              lineHeight: imageConfig.titleLineHeight || 1.2
-            }"
-            @mousedown="startDrag"
-            @touchstart="startDrag"
-          >
-            {{ imageConfig.titleText }}
-          </div>
-        </div>
-      </div>
-    </div>
+    <AIKeyModal v-model="showKeyModal" @save="saveApiKey" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { marked } from 'marked'
+import { ref, onMounted, watch } from 'vue'
 import * as htmlToImage from 'html-to-image'
 
+import MarkdownEditor from './components/MarkdownEditor.vue'
+import ImageEditor from './components/ImageEditor.vue'
+import CoverPreview from './components/CoverPreview.vue'
+import AIKeyModal from './components/AIKeyModal.vue'
+import { Message } from '@/components/Message/index'
+
 const currentMode = ref('markdown')
+const aiMode = ref('optimize')
 
 const imageConfig = ref({
   bgUrl: '',
@@ -117,8 +51,6 @@ const imageConfig = ref({
   titleX: 50,
   titleY: 100
 })
-
-const bgInput = ref(null)
 
 const markdownText = ref(`# 🌟 2026 前端大咖学习路线
 
@@ -136,13 +68,13 @@ const markdownText = ref(`# 🌟 2026 前端大咖学习路线
 👉 **划到下一页看详细学习计划！**
 每天进步一点点，记得点赞收藏，防走丢哦~ ❤️`)
 
-const coverRef = ref(null)
-const textareaRef = ref(null)
+const previewRef = ref(null)
 const isExporting = ref(false)
 
-const parsedHTML = computed(() => {
-  return marked.parse(markdownText.value)
-})
+// AI 相关的状态
+const showKeyModal = ref(false)
+const isAILoading = ref(false)
+const apiKey = ref('')
 
 onMounted(() => {
   const saved = localStorage.getItem('xhs-image-config')
@@ -151,149 +83,100 @@ onMounted(() => {
       imageConfig.value = { ...imageConfig.value, ...JSON.parse(saved) }
     } catch(e) {}
   }
+  
+  const savedKey = localStorage.getItem('deepseek-api-key')
+  if (savedKey) {
+    apiKey.value = savedKey
+  }
 })
 
 watch(() => imageConfig.value, (val) => {
   localStorage.setItem('xhs-image-config', JSON.stringify(val))
 }, { deep: true })
 
-const uploadBg = (e) => {
-  const file = e.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      imageConfig.value.bgUrl = ev.target.result
-    }
-    reader.readAsDataURL(file)
+// AI 排版逻辑
+const handleAIFormat = (mode = 'optimize') => {
+  if (isAILoading.value) return
+  aiMode.value = mode
+  if (!apiKey.value) {
+    showKeyModal.value = true
+    return
   }
+  callDeepSeek()
 }
 
-// 拖拽文字逻辑
-let dragState = { isDragging: false, startX: 0, startY: 0, initialX: 0, initialY: 0 }
-
-const startDrag = (e) => {
-  dragState.isDragging = true
-  const touch = e.type === 'touchstart' ? e.touches[0] : e
-  dragState.startX = touch.clientX
-  dragState.startY = touch.clientY
-  dragState.initialX = imageConfig.value.titleX
-  dragState.initialY = imageConfig.value.titleY
-  
-  document.addEventListener('mousemove', onDrag)
-  document.addEventListener('mouseup', stopDrag)
-  document.addEventListener('touchmove', onDrag, { passive: false })
-  document.addEventListener('touchend', stopDrag)
+const saveApiKey = (key) => {
+  apiKey.value = key
+  localStorage.setItem('deepseek-api-key', apiKey.value)
+  showKeyModal.value = false
+  callDeepSeek()
 }
 
-const onDrag = (e) => {
-  if (!dragState.isDragging) return
-  if (e.cancelable) e.preventDefault()
-  
-  const touch = e.type.startsWith('touch') ? e.touches[0] : e
-  const dx = touch.clientX - dragState.startX
-  const dy = touch.clientY - dragState.startY
-  
-  const isMobile = window.innerWidth <= 768
-  const scale = isMobile ? 0.7 : 1
-  
-  imageConfig.value.titleX = dragState.initialX + dx / scale
-  imageConfig.value.titleY = dragState.initialY + dy / scale
-}
-
-const stopDrag = () => {
-  dragState.isDragging = false
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', stopDrag)
-  document.removeEventListener('touchmove', onDrag)
-  document.removeEventListener('touchend', stopDrag)
-}
-
-// 插入 Markdown 语法的核心逻辑
-const insertSyntax = (type) => {
-  const textarea = textareaRef.value
-  if (!textarea) return
-
-  const start = textarea.selectionStart
-  const end = textarea.selectionEnd
-  const selectedText = markdownText.value.substring(start, end)
-  
-  let before = ''
-  let after = ''
-  let defaultText = ''
-
-  switch (type) {
-    case 'bold':
-      before = '**'
-      after = '**'
-      defaultText = '加粗文字'
-      break
-    case 'italic':
-      before = '*'
-      after = '*'
-      defaultText = '斜体文字'
-      break
-    case 'h1':
-      before = '# '
-      after = ''
-      defaultText = '一级标题'
-      // 特殊处理：标题最好是在新的一行
-      if (start > 0 && markdownText.value[start - 1] !== '\n') before = '\n# '
-      break
-    case 'h2':
-      before = '## '
-      after = ''
-      defaultText = '二级标题'
-      if (start > 0 && markdownText.value[start - 1] !== '\n') before = '\n## '
-      break
-    case 'quote':
-      before = '> '
-      after = ''
-      defaultText = '引用文字'
-      if (start > 0 && markdownText.value[start - 1] !== '\n') before = '\n> '
-      break
-    case 'ul':
-      before = '- '
-      after = ''
-      defaultText = '列表项'
-      if (start > 0 && markdownText.value[start - 1] !== '\n') before = '\n- '
-      break
-    case 'ol':
-      before = '1. '
-      after = ''
-      defaultText = '列表项'
-      if (start > 0 && markdownText.value[start - 1] !== '\n') before = '\n1. '
-      break
-    case 'hr':
-      before = '\n---\n'
-      after = ''
-      defaultText = ''
-      break
+const callDeepSeek = async () => {
+  if (!markdownText.value.trim()) {
+    Message.warning('请输入需要排版的文字内容')
+    return
   }
+  isAILoading.value = true
 
-  const insertText = selectedText || defaultText
-  const newText = markdownText.value.substring(0, start) + before + insertText + after + markdownText.value.substring(end)
+  const systemPromptOptimize = '你是一个专业的小红书文案爆款排版专家。请帮我重新排版、润色用户提供的文字内容。要求：1. 使用 Markdown 格式进行排版，最大的标题请从三级标题(###)开始，绝对不要使用一级标题(#)和二级标题(##)；2. 适当使用标题(如## \n### 等)、加粗(**)、列表(-)、等语法；3. 合理加入Emoji表情使其更生动；4. 重点突出，网感好，段落清晰，段落之间空行；5. 直接返回排版好的内容，不要做任何多余的解释或寒暄。'
   
-  markdownText.value = newText
+  const systemPromptFormatOnly = '你是一个强大的 Markdown 智能排版助手。职责是为用户提供的原文添加合适的 Markdown 排版格式，比如提取标题(###，####等)、将多项并列整合为列表(-)、加粗重点词汇(**)并按意群进行分段空行。要求：最大标题请从三级级标题(###)开始，绝对不要使用一级标题(#)和二级标题(##)；必须完全保留用户原始的文字结构、语气和语意，绝对禁止大篇幅删减或修改用户原话。直接返回排版好的 Markdown 内容，不要做任何解释。'
 
-  // 恢复焦点并选中填入的文本（如果是默认占位文本则全选占位文本，如果是已有选中内容则保持选中）
-  setTimeout(() => {
-    textarea.focus()
-    if (selectedText) {
-      textarea.setSelectionRange(start + before.length, start + before.length + selectedText.length)
-    } else if (defaultText) {
-      textarea.setSelectionRange(start + before.length, start + before.length + defaultText.length)
+  const currentSystemPrompt = aiMode.value === 'format-only' ? systemPromptFormatOnly : systemPromptOptimize
+
+  try {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey.value}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: currentSystemPrompt
+          },
+          {
+            role: 'user',
+            content: markdownText.value
+          }
+        ],
+        temperature: 0.7
+      })
+    })
+
+    const data = await response.json()
+    if (response.ok) {
+      if (data.choices && data.choices.length > 0) {
+        markdownText.value = data.choices[0].message.content
+      }
     } else {
-      // 仅插入了符号，光标移到最后
-      textarea.setSelectionRange(start + before.length, start + before.length)
+      if (response.status === 401 || response.status === 403) {
+        Message.warning('API Key 似乎无效或已过期，请重新配置。')
+        apiKey.value = ''
+        localStorage.removeItem('deepseek-api-key')
+        showKeyModal.value = true
+        return
+      }
+      throw new Error(data.error?.message || '请求失败，请检查 API Key 余额或网络环境。')
     }
-  }, 0)
+  } catch (error) {
+    console.error('AI 排版失败:', error)
+    Message.error(`AI 排版出错: \n${error.message}\n如果是跨域网络问题，请检查网络以及 API Key 是否有效。`)
+  } finally {
+    isAILoading.value = false
+  }
 }
 
 const exportImage = async () => {
-  if (!coverRef.value || isExporting.value) return
+  const coverEl = previewRef.value?.getCoverElement()
+  if (!coverEl || isExporting.value) return
   isExporting.value = true
   try {
-    const dataUrl = await htmlToImage.toPng(coverRef.value, {
+    const dataUrl = await htmlToImage.toPng(coverEl, {
       quality: 1,
       pixelRatio: 3,
       style: {
@@ -307,7 +190,7 @@ const exportImage = async () => {
     link.click()
   } catch (err) {
     console.error('导出失败:', err)
-    alert('导出图片失败，请检查控制台')
+    Message.error('导出图片失败，请检查控制台')
   } finally {
     isExporting.value = false
   }
@@ -373,181 +256,6 @@ const exportImage = async () => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.form-group {
-  margin-bottom: 24px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Image Mode Setup */
-.image-mode-group {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.tool-section {
-  display: flex;
-  flex-direction: column;
-}
-
-.tool-section.row {
-  flex-direction: row;
-  gap: 16px;
-}
-
-.control-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.upload-box {
-  width: 100%;
-  height: 80px;
-  border: 2px dashed #dcdfe6;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #909399;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s;
-  background-color: #fafbfc;
-}
-
-.upload-box:hover {
-  border-color: #ff2442;
-  color: #ff2442;
-}
-
-.title-input {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e4e7ed;
-  border-radius: 8px;
-  font-size: 14px;
-  resize: none;
-  outline: none;
-  transition: border-color 0.2s;
-  font-family: inherit;
-}
-
-.title-input:focus {
-  border-color: #ff2442;
-}
-
-.color-picker {
-  width: 100%;
-  height: 40px;
-  padding: 0;
-  border: 2px solid #e4e7ed;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.number-input {
-  width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  border: 2px solid #e4e7ed;
-  border-radius: 6px;
-  font-size: 14px;
-  outline: none;
-  box-sizing: border-box;
-}
-
-.number-input:focus {
-  border-color: #ff2442;
-}
-
-.form-group label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: #333;
-  font-size: 15px;
-}
-
-/* 工具栏样式 */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px;
-  background-color: #f8f9fa;
-  border: 2px solid #e4e7ed;
-  border-bottom: none; /* 与文本框无缝连接 */
-  border-radius: 12px 12px 0 0;
-}
-
-.tool-btn {
-  min-width: 32px;
-  height: 32px;
-  padding: 0 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  color: #606266;
-  font-size: 14px;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-
-.tool-btn:hover {
-  background-color: #e4e7ed;
-  color: #ff2442;
-}
-
-.tool-btn:active {
-  background-color: #dcdfe6;
-}
-
-.font-bold { font-weight: bold; }
-.font-italic { font-style: italic; font-family: serif; }
-.text-xl { font-size: 18px; line-height: 1; }
-
-.divider {
-  width: 1px;
-  height: 16px;
-  background-color: #dcdfe6;
-  margin: 0 4px;
-}
-
-textarea {
-  flex: 1;
-  width: 100%;
-  padding: 16px;
-  border: 2px solid #e4e7ed;
-  border-radius: 0 0 12px 12px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 14px;
-  line-height: 1.6;
-  resize: none; /* 禁用拖拽大小，填满剩余高度 */
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.2s;
-  background-color: #fafbfc;
-}
-
-textarea:focus {
-  border-color: #ff2442;
-  background-color: #fff;
-}
-
-.form-group:focus-within .toolbar {
-  border-color: #ff2442;
-}
-.form-group:focus-within textarea {
-  border-color: #ff2442;
-}
-
 .export-btn {
   padding: 16px 24px;
   background: #ff2442;
@@ -581,172 +289,6 @@ textarea:focus {
   text-align: center;
 }
 
-/* 右侧画布区域：SaaS 设计工具风格（带网格背景） */
-.preview-panel {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex: 1;
-  background-color: #f1f2f5;
-  background-image: 
-    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
-  background-size: 20px 20px;
-  overflow: auto;
-  position: relative;
-}
-
-.cover-wrapper {
-  /* 严格 3:4 比例，中心海报画布 */
-  width: 480px;
-  height: 640px;
-  background: #fffdf9;
-  background-image: linear-gradient(to bottom right, #ffffff 0%, #fcf7f2 100%);
-  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.02);
-  border-radius: 4px;
-  overflow: hidden;
-  position: relative;
-  /* 确保缩放正常工作 */
-  flex-shrink: 0;
-}
-
-.cover-content {
-  width: 100%;
-  height: 100%;
-  padding: 48px 40px; 
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start; 
-  overflow: hidden;
-}
-
-.cover-image-content {
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  position: relative;
-  overflow: hidden;
-  background-color: #ececec;
-}
-
-.empty-bg-tip {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #909399;
-  font-size: 16px;
-  pointer-events: none;
-}
-
-.draggable-title {
-  position: absolute;
-  cursor: grab;
-  user-select: none;
-  white-space: pre-wrap;
-  line-height: 1.2;
-  font-weight: 900;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.draggable-title:active {
-  cursor: grabbing;
-}
-
-/* ================= 预览区排版 ================= */
-.markdown-body {
-  font-family: 'Noto Sans SC', 'PingFang SC', 'Helvetica Neue', Helvetica, 'Microsoft YaHei', Arial, sans-serif;
-  color: #2c3e50;
-  width: 100%;
-}
-
-.markdown-body :deep(h1) {
-  font-size: 34px;
-  margin-top: 0;
-  margin-bottom: 24px;
-  text-align: center;
-  line-height: 1.35;
-  color: #1a1a1a;
-  font-weight: 900;
-  letter-spacing: 1.5px;
-}
-
-.markdown-body :deep(h2) {
-  font-size: 22px;
-  margin-top: 24px;
-  margin-bottom: 16px;
-  color: #1a1a1a;
-  border-bottom: none;
-  font-weight: 800;
-  position: relative;
-  padding-left: 14px;
-  line-height: 1.4;
-}
-
-.markdown-body :deep(h2)::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 5px;
-  height: 20px;
-  background: #ff2442;
-  border-radius: 4px;
-}
-
-.markdown-body :deep(p) {
-  font-size: 15px;
-  line-height: 1.8;
-  margin-bottom: 16px;
-  color: #333333;
-}
-
-.markdown-body :deep(ul), .markdown-body :deep(ol) {
-  padding-left: 24px;
-  margin-bottom: 20px;
-}
-
-.markdown-body :deep(li) {
-  font-size: 15px;
-  line-height: 1.8;
-  margin-bottom: 10px;
-  color: #333333;
-}
-
-.markdown-body :deep(li::marker) {
-  color: #ff2442;
-  font-weight: 900;
-}
-
-.markdown-body :deep(strong) {
-  color: #ff2442; 
-  font-weight: 800;
-}
-
-.markdown-body :deep(blockquote) {
-  margin: 24px 0;
-  padding: 20px 24px;
-  background: #f8f9fa;
-  border-left: 5px solid #ff2442;
-  border-radius: 0 10px 10px 0;
-  color: #555;
-  font-size: 15px;
-  font-family: 'Noto Serif SC', 'SimSun', serif; 
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-}
-
-.markdown-body :deep(hr) {
-  border: 0;
-  border-top: 2px dashed rgba(0, 0, 0, 0.1);
-  margin: 28px 0;
-}
-
-/* ================= 移动端适配 ================= */
 @media (max-width: 768px) {
   .container-home {
     position: static;
@@ -767,34 +309,6 @@ textarea:focus {
   .editor-panel h2 {
     font-size: 20px;
     margin-bottom: 16px;
-  }
-
-  .toolbar {
-    flex-wrap: wrap; 
-    gap: 4px;
-  }
-
-  .tool-btn {
-    min-width: 28px;
-    height: 28px;
-    padding: 0 4px;
-  }
-
-  textarea {
-    min-height: 200px;
-  }
-
-  .preview-panel {
-    padding: 40px 0;
-    align-items: flex-start;
-    overflow: visible;
-  }
-
-  .cover-wrapper {
-    transform: scale(0.7);
-    transform-origin: top left;
-    margin-bottom: -192px; 
-    margin-right: -144px;
   }
 }
 </style>

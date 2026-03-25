@@ -7,6 +7,15 @@
       <MarkdownEditor style="flex: 1;" v-model="markdownText" hide-ai />
       
       <div class="actions">
+        <div class="theme-selector">
+          <select v-model="currentTheme">
+            <option value="tech">💎 科技职场风格</option>
+            <option value="minimal">🍏 苹果极简风格</option>
+            <option value="emotion">💌 情感走心风格</option>
+            <option value="indigo">📘 深度技术风格</option>
+            <option value="geek">💻 极客开发风格</option>
+          </select>
+        </div>
         <button class="action-btn primary" @click="copyHtml">🔗 一键复制排版去公众号粘贴</button>
       </div>
     </div>
@@ -28,57 +37,70 @@ import { Message } from '@/components/Message/index'
 import MarkdownEditor from '../xiaohongshu/components/MarkdownEditor.vue'
 import AIKeyModal from '../xiaohongshu/components/AIKeyModal.vue'
 import { useDeepSeek } from '@/utils/useDeepSeek'
+import type { WechatTheme } from '@/utils/wechatRenderer'
 import { renderWechatHtml } from '@/utils/wechatRenderer'
 
-const markdownText = ref(`# 🔥别再傻傻海投了！\n<span style="color: #2b5cff;">6个神级AI指令</span>，把求职变成一场“降维打击”
+const currentTheme = ref<WechatTheme>('tech')
 
-> 最近正是求职季，你是不是也陷入了这样的死循环：
-> 精心准备的简历投出去石沉大海，Boss直聘上发了上百个招呼全是“已读不回”……
-> 
-> **停！别再用战术上的勤奋，掩盖战略上的懒惰了！**
-> 在这个 AI 时代，教你 6 个被外网疯传、实测好用到爆的 AI 提示词！
-> 
-> <span style="color: #ff6b6b; font-weight: bold; font-size: 14px; text-align: center; display: block;">⭐ 建议先收藏，找工作时一定用得上！</span>
+const markdownText = ref(`# 🚀 全新一代公众号排版引擎（测试文档）
+<span style="color: #888; font-size: 14px;">（请在右上角下拉框自由切换 4 种预设主题体验区别！）</span>
 
-## 01 扔掉流水账，把简历变成“王炸”
+> 欢迎使用纯本地化构建的 Markdown 公众号渲染器！
+> 无论是 **科技职场**、**极简干货**、**情感走心** 还是 **极客开发**，我们都能瞬间帮您拿捏气场。
+> 下面我将为您展示目前渲染器支持的所有排版元素种类。
 
-### 💼 适用场景 重新打磨简历地基，增加量化数据
+## 01 基础版式与文字强调
 
-很多人写简历就像写流水账：我干了什么、负责什么……HR 扫一眼就困了。我们要让 AI 帮你加上“动词”和“量化数据”。
+### 💡 多级标题支持
 
-\`\`\`
-这是我的工作经验：[填入你的日常职责]。
+你不仅能用常规的加粗来 **强调文本**，还能利用不同的标题层级制造视觉冲击：
 
-请针对[某行业]的[具体职位]，重写我的简历经历。要求突出核心业务成果。
-\`\`\`
+#### 这是一个四级标题，相当于强调卡片，通常用来做高亮总结与核心观点升华！
 
-#### ✨ 降维效果：AI 会把你干瘪的“负责账号运营”，变成“主导小红书矩阵运营，实现粉丝量增长 150%”。这才是 HR 想看的！
+## 02 代码与极客元素支持
 
-## 02 为神仙岗位“量身定制”
+在现代技术博客中，行内代码 \`console.log('Hello World')\` 是必不可少的。而对于大段长串代码，这里有完美的适配保护：
 
-### 🎯 适用场景 针对心仪的高薪公司，精准匹配JD
-
-不要一份简历走天下，这只会让你成为分母。
-
-\`\`\`
-这是我心仪的职位JD：[粘贴JD]。
-把它与我的经历对比，提取JD中的核心关键词润色我的经历，达到 90% 以上的匹配度！
+\`\`\`javascript
+// 💬 核心业务流保护样例：
+function optimizeWorkflow() {
+  const tools = ['GPT-4o', 'Claude 3.5', 'DeepSeek'];
+  console.log('开启全自动极客模式！');
+  return tools.map(tool => activate(tool));
+}
 \`\`\`
 
-#### ✨ 降维效果：机器筛选（ATS）能秒过，人工审核时 HR 也会觉得你是完美候选人！
+## 03 列表与数据表格展示
+
+有时候你需要有条理地陈列信息，这是无序/有序列表嵌套排版的演示：
+
+*   **准备工作阶段**
+    *   下载并安装最新版本开发工具
+    *   输入 \`chrome://inspect\` 打开配置
+*   **落地执行步骤**
+    1.  梳理自动化重构流程
+    2.  坚决执行任务，定期复盘
+
+当遇到对比数据时，表格是梳理逻辑的最佳解药（原生支持左、中、右列对齐定制）：
+
+| 底层基础模型 | 逻辑推理能力 | 代码生成能力 | 核心适用场景定位 |
+| :--- | :---: | :---: | :--- |
+| **Claude 3.5** | 卓越（S 级） | ✨ 巅峰（SS 级） | 前后端组件全自动构建、老项目重构 |
+| **GPT-4o** | 优秀（S 级） | 优秀（S 级） | 通用知识结构解答、多模态任务流处理 |
+| **DeepSeek** | 强大（S 级） | 极为优秀（S 级）| 极高性价比的日常高频需求开发助手 |
 
 ---
 
 <div style="text-align: center; color: #888; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-  👇 你觉得找工作哪个环节最痛苦？欢迎留言！
+  👇 你觉得今天加的哪个主题最好看？快去上方下拉框自由切换试试吧！
 </div>`)
 
 const { isAILoading, showKeyModal, apiKey, formatTextWithAI, saveApiKey } = useDeepSeek()
 const previewRef = ref<HTMLElement | null>(null)
 
-// 替换掉之前简陋的正则表达式，改用真正的 Markdown 渲染引擎
+// 响应式渲染多主题 Markdown
 const renderedHtml = computed(() => {
-  return renderWechatHtml(markdownText.value)
+  return renderWechatHtml(markdownText.value, currentTheme.value)
 })
 
 const handleAIFormat = async (mode: 'optimize' | 'format-only' = 'optimize') => {
@@ -175,6 +197,23 @@ const copyHtml = async () => {
   display: flex;
   gap: 16px;
   margin-top: 24px;
+  align-items: center;
+}
+
+.theme-selector select {
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #dcdfe6;
+  font-size: 15px;
+  outline: none;
+  background: white;
+  cursor: pointer;
+  color: #333;
+  transition: all 0.3s;
+}
+
+.theme-selector select:hover {
+  border-color: #1890ff;
 }
 
 .action-btn {

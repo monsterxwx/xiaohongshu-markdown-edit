@@ -213,7 +213,7 @@ const themes: Record<WechatTheme, ThemeConfig> = {
         </div>
       </section>`,
     codespan: (text) => `<code style="background-color: #F3F4F6; padding: 3px 6px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; color: #4B5563; margin: 0 2px;">${text}</code>`,
-    strong: (text) => `<strong style="font-weight: 900; color: #111;">${text}</strong>`
+    strong: (text) => `<strong style="font-weight: bold; color: #dd7600;">${text}</strong>`
   }
 };
 

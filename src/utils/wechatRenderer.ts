@@ -110,12 +110,12 @@ const themes: Record<WechatTheme, ThemeConfig> = {
         </section>`,
     h2: (text, rawText) => {
       const display = rawText.match(/^([\d]+)[ \.]*(.*)$/) ? text.replace(/^([\d]+)[ \.]*/, '') : text;
-      return `<div style="text-align: center; margin: 45px 0 25px;"><h2 style="display: inline-block; background: linear-gradient(to right, #fff0f3, #fff); padding: 6px 20px; border-radius: 30px; color: #ff5e7e; font-size: 17px; font-weight: bold; margin: 0;">${display}</h2></div>`;
+      return `<section style="text-align: center; margin: 45px 0 25px;"><h2 style="display: block; font-size: 18px; color: #ff5e7e; font-weight: bold; margin: 0; line-height: 1.7; letter-spacing: 1.5px; text-decoration: underline; text-underline-offset: 8px; text-decoration-color: #ffb3c6; text-decoration-thickness: 2px;">${display}</h2></section>`;
     },
     h3: (text) => `<h3 style="font-size: 15px; color: #ff8fa3; font-weight: bold; border-left: 3px solid #ff8fa3; padding-left: 12px; margin: 30px 0 15px 0;">${text}</h3>`,
     h4: (text) => `
-        <section style="background-color: #fff0f3; color: #d6336c; padding: 20px; border-radius: 12px; font-size: 14px; line-height: 1.8; text-align: center; margin: 25px 0;">
-            <p style="margin: 0; font-weight: 500; letter-spacing: 1.5px;">暖心寄语：${text}</p>
+        <section style="background-color: #fff0f3; color: #d6336c; padding: 18px 20px; border-radius: 12px; margin: 25px 0;">
+            <p style="margin: 0; font-size: 14px; font-weight: 500; letter-spacing: 1.5px; line-height: 1.8; text-align: justify;">${text}</p>
         </section>`,
     blockquote: (html) => `
       <section style="background-color: #fdf2f4; border-left: 4px solid #ffb3c6; padding: 15px 20px; border-radius: 0 8px 8px 0; margin: 25px 0;">

@@ -21,7 +21,7 @@
           <span v-if="isAILoading && localLoadingMode === 'format-only'" class="loading-spinner"></span>
           <span v-else>📐 排版</span>
         </button>
-        <button class="tool-btn ai-btn ai-enhance" @click="handleAIFormat('optimize')" title="AI 润色：润色优化并排版文字内容（可能修改或增强原文）" :disabled="isAILoading">
+        <button v-if="!hideAiOptimize" class="tool-btn ai-btn ai-enhance" @click="handleAIFormat('optimize')" title="AI 润色：润色优化并排版文字内容（可能修改或增强原文）" :disabled="isAILoading">
           <span v-if="isAILoading && localLoadingMode === 'optimize'" class="loading-spinner"></span>
           <span v-else>✨ AI 润色</span>
         </button>
@@ -49,6 +49,10 @@ const props = defineProps({
     default: false
   },
   hideAi: {
+    type: Boolean,
+    default: false
+  },
+  hideAiOptimize: {
     type: Boolean,
     default: false
   }

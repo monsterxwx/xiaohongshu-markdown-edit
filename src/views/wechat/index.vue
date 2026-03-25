@@ -4,7 +4,7 @@
       <h2>✍️ 公众号长文排版</h2>
       <div class="subtitle">在这里编写 Markdown，右侧实时预览公众号最终效果</div>
       
-      <MarkdownEditor style="flex: 1;" v-model="markdownText" hide-ai />
+      <MarkdownEditor style="flex: 1;" v-model="markdownText" :isAILoading="isAILoading" @ai-format="handleAIFormat" hide-ai-optimize />
       
       <div class="actions">
         <div class="theme-selector">
